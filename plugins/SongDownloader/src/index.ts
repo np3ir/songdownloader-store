@@ -12,6 +12,7 @@ import { buildFileName, getDownloadFolder, getDownloadPath } from "./helpers";
 import { getFeaturedContributors } from "./contributors";
 import { cleanTitle, orderArtists } from "./tags";
 import { dedupAlbums, getArtistAlbums, sortAlbumsOldestFirst } from "./artist";
+import { downloadState } from "./cancel";
 import { downloadTrack, getProgress } from "./download.native";
 import { settings } from "./Settings";
 
@@ -145,13 +146,27 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 
 	downloadButton.onClick(async () => {
 		if (downloadButton.elem === undefined) return;
-		const downloadFolder = settings.defaultPath ?? (trackCount > 1 ? await getDownloadFolder() : undefined);
-		downloadButton.elem.classList.add("download-button");
-		for await (const mediaItem of await mediaCollection.mediaItems()) {
-			await downloadMediaItem(mediaItem, downloadFolder, downloadButton);
+		// Re-click mientras hay una descarga en curso = detenerla.
+		if (downloadState.active) {
+			downloadState.cancel = true;
+			downloadButton.text = `Stopping...`;
+			return;
 		}
-		downloadButton.text = defaultText;
-		downloadButton.elem.classList.remove("download-button");
+		const downloadFolder = settings.defaultPath ?? (trackCount > 1 ? await getDownloadFolder() : undefined);
+		downloadState.active = true;
+		downloadState.cancel = false;
+		downloadButton.elem.classList.add("download-button");
+		try {
+			for await (const mediaItem of await mediaCollection.mediaItems()) {
+				if (downloadState.cancel) break;
+				await downloadMediaItem(mediaItem, downloadFolder, downloadButton);
+			}
+		} finally {
+			downloadState.active = false;
+			downloadState.cancel = false;
+			downloadButton.text = defaultText;
+			downloadButton.elem?.classList.remove("download-button");
+		}
 	});
 
 	await downloadButton.show(contextMenu);
@@ -169,11 +184,19 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 	artistButton.text = `Download artist`;
 	artistButton.onClick(async () => {
 		if (artistButton.elem === undefined) return;
+		// Re-click mientras hay una descarga en curso = detenerla.
+		if (downloadState.active) {
+			downloadState.cancel = true;
+			artistButton.text = `Stopping...`;
+			return;
+		}
 		// La descarga de artista SIEMPRE necesita una carpeta base (son cientos de
 		// tracks; nunca preguntar ruta por cada uno).
 		const folder = settings.defaultPath ?? (await getDownloadFolder());
 		if (folder === undefined) return;
 
+		downloadState.active = true;
+		downloadState.cancel = false;
 		artistButton.elem.classList.add("download-button");
 		try {
 			artistButton.text = `Fetching discography...`;
@@ -186,23 +209,27 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 				return;
 			}
 
-			for (let i = 0; i < albums.length; i++) {
+			for (let i = 0; i < albums.length && !downloadState.cancel; i++) {
 				const album = await Album.fromId(albums[i].id).catch(() => undefined);
 				if (album === undefined) continue;
 
 				let j = 0;
 				for await (const mediaItem of await album.mediaItems()) {
+					if (downloadState.cancel) break;
 					j++;
 					const prefix = `[${i + 1}/${albums.length} · ${j}] `;
 					await downloadMediaItem(mediaItem, folder, artistButton, prefix).catch(
 						trace.msg.err.withContext(`Artist download (album ${albums[i].title})`),
 					);
+					if (downloadState.cancel) break;
 					if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
 				}
-				if (settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
+				if (!downloadState.cancel && settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
 			}
-			artistButton.text = `Done`;
+			artistButton.text = downloadState.cancel ? `Stopped` : `Done`;
 		} finally {
+			downloadState.active = false;
+			downloadState.cancel = false;
 			artistButton.elem?.classList.remove("download-button");
 			setTimeout(() => (artistButton.text = `Download artist`), 3000);
 		}

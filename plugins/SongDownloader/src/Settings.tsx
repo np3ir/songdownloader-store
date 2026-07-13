@@ -11,6 +11,7 @@ import { LunaButtonSetting, LunaSelectItem, LunaSelectSetting, LunaSettings, Lun
 
 import React from "react";
 import { getDownloadFolder } from "./helpers";
+import { requestStop } from "./cancel";
 
 // Default alineado con el template de tiddl del usuario (config.toml [templates].default)
 const defaultFilenameFormat = "{artist_initials}/{albumArtist}/({year}) {album}/{trackNumber}. {artist} - {title}{explicit}";
@@ -81,6 +82,18 @@ export const Settings = () => {
 
 	return (
 		<LunaSettings>
+			<LunaButtonSetting
+				title="Stop current download"
+				desc={
+					<>
+						Cancel a running download (album, playlist or artist). The current track finishes, then it stops.
+						<br />
+						You can also just click the download button again while it's running.
+					</>
+				}
+				children="Stop"
+				onClick={() => requestStop()}
+			/>
 			<LunaSelectSetting
 				title="Download quality"
 				value={downloadQuality}
