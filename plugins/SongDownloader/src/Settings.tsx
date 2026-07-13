@@ -1,3 +1,10 @@
+/*
+ *  ┌──────────────────────────────────────────────────────────────┐
+ *  │   Song Downloader (ElVigilante) — Luna Plugin Store          │
+ *  └──────────────────────────────────────────────────────────────┘
+ *  https://github.com/np3ir/songdownloader-store
+ *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
+ */
 import { ReactiveStore } from "@luna/core";
 import { MediaItem, Quality, type redux } from "@luna/lib";
 import { LunaButtonSetting, LunaSelectItem, LunaSelectSetting, LunaSettings, LunaSwitchSetting, LunaTextSetting } from "@luna/ui";
@@ -8,6 +15,7 @@ import { getDownloadFolder } from "./helpers";
 const defaultFilenameFormat = "{artist} - {album} - {title}";
 const DEFAULT_ARTIST_SEPARATOR = " / "; // DEFAULT_ARTIST_SEPARATOR del fork tiddl-elvigilante
 const DEFAULT_MAX_ARTISTS_IN_NAME = 3; // MAX_ARTISTS_IN_NAME del fork tiddl-elvigilante
+const DEFAULT_TRACK_NUMBER_PADDING = 2; // {trackNumber} -> "01." (0 = sin padding)
 
 type Settings = {
 	downloadQuality: redux.AudioQuality;
@@ -20,6 +28,7 @@ type Settings = {
 	fetchFeatured: boolean;
 	saveLrc: boolean;
 	maxArtistsInName: number;
+	trackNumberPadding: number;
 };
 export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDownloader", {
 	downloadQuality: Quality.Max.audioQuality,
@@ -30,12 +39,14 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	fetchFeatured: true,
 	saveLrc: true,
 	maxArtistsInName: DEFAULT_MAX_ARTISTS_IN_NAME,
+	trackNumberPadding: DEFAULT_TRACK_NUMBER_PADDING,
 });
 
 // Sanitize download quality
 if (Quality.fromAudioQuality(settings.downloadQuality) === undefined) settings.downloadQuality = Quality.Max.audioQuality;
-// Sanitize numeric setting (ReactiveStore may hydrate an old install without it)
+// Sanitize numeric settings (ReactiveStore may hydrate an old install without them)
 if (!Number.isFinite(settings.maxArtistsInName) || settings.maxArtistsInName < 1) settings.maxArtistsInName = DEFAULT_MAX_ARTISTS_IN_NAME;
+if (!Number.isFinite(settings.trackNumberPadding) || settings.trackNumberPadding < 0) settings.trackNumberPadding = DEFAULT_TRACK_NUMBER_PADDING;
 
 export const Settings = () => {
 	const [downloadQuality, setDownloadQuality] = React.useState(settings.downloadQuality);
@@ -47,6 +58,7 @@ export const Settings = () => {
 	const [fetchFeatured, setFetchFeatured] = React.useState(settings.fetchFeatured);
 	const [saveLrc, setSaveLrc] = React.useState(settings.saveLrc);
 	const [maxArtistsInName, setMaxArtistsInName] = React.useState(String(settings.maxArtistsInName));
+	const [trackNumberPadding, setTrackNumberPadding] = React.useState(String(settings.trackNumberPadding));
 
 	return (
 		<LunaSettings>
@@ -129,6 +141,23 @@ export const Settings = () => {
 					setMaxArtistsInName(raw);
 					const n = parseInt(raw, 10);
 					if (Number.isFinite(n) && n >= 1) settings.maxArtistsInName = n;
+				}}
+			/>
+			<LunaTextSetting
+				title="Track number padding"
+				desc={
+					<>
+						Zero-pad <b>{"{trackNumber}"}</b> in the filename to this many digits (e.g. <b>2</b> → <b>01.</b>).
+						<br />
+						Set to <b>0</b> to disable padding.
+					</>
+				}
+				value={trackNumberPadding}
+				onChange={(e) => {
+					const raw = e.target.value;
+					setTrackNumberPadding(raw);
+					const n = parseInt(raw, 10);
+					if (Number.isFinite(n) && n >= 0) settings.trackNumberPadding = n;
 				}}
 			/>
 			<LunaSwitchSetting

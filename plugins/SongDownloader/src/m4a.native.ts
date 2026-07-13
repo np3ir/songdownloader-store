@@ -1,3 +1,10 @@
+/*
+ *  ┌──────────────────────────────────────────────────────────────┐
+ *  │   Song Downloader (ElVigilante) — Luna Plugin Store          │
+ *  └──────────────────────────────────────────────────────────────┘
+ *  https://github.com/np3ir/songdownloader-store
+ *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
+ */
 import { ByteVector, File as TagFile, Picture, PictureType } from "node-taglib-sharp";
 
 /**

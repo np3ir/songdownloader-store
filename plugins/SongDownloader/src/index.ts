@@ -1,3 +1,10 @@
+/*
+ *  ┌──────────────────────────────────────────────────────────────┐
+ *  │   Song Downloader (ElVigilante) — Luna Plugin Store          │
+ *  └──────────────────────────────────────────────────────────────┘
+ *  https://github.com/np3ir/songdownloader-store
+ *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
+ */
 import { Tracer, type LunaUnload } from "@luna/core";
 import { ContextMenu, safeInterval, StyleTag } from "@luna/lib";
 
@@ -78,6 +85,7 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 				separator: settings.artistSeparator,
 				useFullwidth: settings.useFullwidth,
 				maxArtistsInName: settings.maxArtistsInName,
+				trackNumberPadding: settings.trackNumberPadding,
 			});
 
 			// 5. Ruta destino

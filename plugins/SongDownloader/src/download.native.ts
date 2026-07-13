@@ -1,3 +1,10 @@
+/*
+ *  ┌──────────────────────────────────────────────────────────────┐
+ *  │   Song Downloader (ElVigilante) — Luna Plugin Store          │
+ *  └──────────────────────────────────────────────────────────────┘
+ *  https://github.com/np3ir/songdownloader-store
+ *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
+ */
 import type { PlaybackInfo } from "@luna/lib";
 import { fetchMediaItemStream, type FetchProgress } from "@luna/lib.native";
 

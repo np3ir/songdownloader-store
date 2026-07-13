@@ -1,3 +1,10 @@
+/*
+ *  ┌──────────────────────────────────────────────────────────────┐
+ *  │   Song Downloader (ElVigilante) — Luna Plugin Store          │
+ *  └──────────────────────────────────────────────────────────────┘
+ *  https://github.com/np3ir/songdownloader-store
+ *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
+ */
 /**
  * Convenciones de tags/nombres PROPIAS del usuario, portadas de su fork
  * `tiddl-elvigilante` (mods hechos con AI — NO existen en el tiddl upstream),
