@@ -52,9 +52,11 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	const featuredExtra = settings.fetchFeatured ? await getFeaturedContributors(mediaItem.id) : [];
 	const ordered = orderArtists(rawArtists, featuredExtra);
 
-	// 3. Override de tags según la convención propia del usuario
+	// 3. Override de tags según la convención propia del usuario.
+	//    El título se limpia pasándole la lista de artistas: así quita el sufijo
+	//    "(with X)"/"(feat. X)" solo si X ya está en {artist}, sin duplicarlo.
 	if (ordered.all.length > 0) tags.artist = ordered.all;
-	tags.title = cleanTitle(mediaItem.tidalItem.title, mediaItem.tidalItem.version);
+	tags.title = cleanTitle(mediaItem.tidalItem.title, mediaItem.tidalItem.version, ordered.all);
 
 	// 3b. Fecha del ÁLBUM para {year}/{date} (nunca por-track; evita fragmentar compilaciones).
 	const album = await mediaItem.album().catch(() => undefined);

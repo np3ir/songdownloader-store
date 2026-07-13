@@ -149,15 +149,55 @@ export const joinArtistsCapped = (names: string[], separator: string, limit = 3)
 	return ns.slice(0, limit).join(separator) + " & others";
 };
 
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Palabras clave de colaboración (feat, ft, with, w/, con, y, x, …) — port de
+// _KEYWORDS_PATTERN del fork tiddl-elvigilante.
+const KW =
+	"f(?:ea)?t(?:\\.|uring)?|with|w/|starring|guest(?: vocals:?)?|vocals?(?::| by)|" +
+	"prod(?:\\.|uced by)|(?:remix|edit|mix) by|vs\\.?|x|×|pres(?:en)?t(?:s|a|e)?|" +
+	"collab(?:oration)?|con|junto a|y|col(?:\\.|aboraci[oó]n)?|invitado|voz(?: de)?|" +
+	"producido por|remix de|mit|avec|et";
+
+// _RE_ANTI_FEAT del fork: 3 formas — (paréntesis/corchetes), " - dash", "feat" pelado.
+const RE_ANTI_FEAT = new RegExp(
+	`(?:\\s*[\\(\\[\\{]\\s*(?:${KW})\\s+([^)\\}\\]]+?)\\s*[\\)\\]\\}])` +
+		`|(?:\\s+[-\\u2013]\\s+\\s*(?:${KW})\\s+(.*))` +
+		`|(?:\\s+f(?:ea)?t(?:\\.|uring)?\\s+(.*))`,
+	"gi",
+);
+
 /**
- * Limpia el título para el tag/nombre: añade "(version)" si existe y elimina
- * los fragmentos "feat." (que ya viven en el tag ARTIST). Equivale a
- * clean_title_for_metadata + sufijo de versión de add_track_metadata (fork).
+ * Limpia el título quitando los sufijos de colaborador ("(with X)", "(feat. Y)",
+ * "- con Z"…) PERO SOLO si ese colaborador ya está en la lista de artistas
+ * (`artistNames`), para no duplicarlo en {artist} y en {title} y a la vez no
+ * romper títulos legítimos (p.ej. "6 Ft. 7 Ft."). Añade "(version)" si existe.
+ * Port fiel de clean_track_title del fork tiddl-elvigilante (con protección is_known).
  */
-export const cleanTitle = (title: string, version?: string | null): string => {
-	let t = version ? `${title} (${version})` : title;
-	t = t.replace(/\s*\(feat\.?[^)]*\)/gi, "");
-	t = t.replace(/\s*\[feat\.?[^\]]*\]/gi, "");
-	t = t.replace(/\s*-\s*feat\.?.*$/gi, "");
-	return t.trim();
+export const cleanTitle = (title: string, version?: string | null, artistNames: string[] = []): string => {
+	const t = version ? `${title} (${version})` : title;
+
+	const metaArtists = artistNames.map((a) => foldAccents(a.trim().toLowerCase())).filter(Boolean);
+	const isKnown = (name: string): boolean => {
+		const n = foldAccents(name.trim().toLowerCase());
+		if (!n) return true; // ignora partes vacías
+		if (metaArtists.includes(n)) return true;
+		const re = new RegExp(`\\b${escapeRegex(n)}\\b`);
+		return metaArtists.some((ma) => re.test(ma)); // word-boundary dentro de un artista
+	};
+
+	const cleaned = t.replace(RE_ANTI_FEAT, (full: string, g1?: string, g2?: string, g3?: string) => {
+		const content = g1 || g2 || g3;
+		if (!content) return full;
+		const parts = content
+			.split(/\s*(?:,|&|\+| and | y | et | und | con | with )\s*/i)
+			.map((p) => p.trim())
+			.filter(Boolean);
+		const unknown = parts.filter((p) => !isKnown(p));
+		if (unknown.length === 0) return ""; // todos conocidos -> quitar el sufijo entero
+		if (unknown.length === parts.length) return full; // ninguno conocido -> dejar tal cual
+		return full.replace(content, unknown.join(", ")); // parcial -> reconstruir con los desconocidos
+	});
+
+	return cleaned.trim();
 };
