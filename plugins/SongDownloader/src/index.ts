@@ -34,9 +34,9 @@ type Button = ReturnType<typeof ContextMenu.addButton>;
  * artista completo. `prefix` se antepone al texto de estado del botón (para
  * mostrar "[álbum i/N · track j] ..." en la descarga de artista).
  */
-const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | undefined, button: Button, prefix = ""): Promise<void> => {
+const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | undefined, button: Button, prefix = ""): Promise<boolean> => {
 	const setText = (t: string) => (button.text = `${prefix}${t}`);
-
+	try {
 	if (settings.useRealMAX) {
 		setText(`Checking RealMax...`);
 		mediaItem = (await mediaItem.max()) ?? mediaItem;
@@ -92,7 +92,7 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 
 	// 5. Ruta destino
 	const path = downloadFolder !== undefined ? [downloadFolder, fileName] : await getDownloadPath(fileName);
-	if (path === undefined) return;
+	if (path === undefined) return false;
 
 	// 6. Sidecar .lrc
 	let lrc: string | undefined;
@@ -104,8 +104,8 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	// 7. Descarga nativa con progreso
 	const playbackInfo = await mediaItem.playbackInfo(settings.downloadQuality);
 	if (playbackInfo === undefined) {
-		trace.msg.err(`Track ${tags.title} is not available for download`);
-		return;
+		trace.err(`Track not available: ${tags.title}`); // callado (sin toast)
+		return false;
 	}
 
 	setText(`Downloading...`);
@@ -130,8 +130,18 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 		},
 		250,
 	);
-	await downloadTrack(trackKey, playbackInfo, path, tags, coverUrl, lrc).catch(trace.msg.err.withContext(`Failed to download ${tags.title}`));
-	clearInterval();
+	try {
+		await downloadTrack(trackKey, playbackInfo, path, tags, coverUrl, lrc);
+	} finally {
+		clearInterval();
+	}
+	return true;
+	} catch (err) {
+		// Falla callada (sin toast): un track malo no debe spamear popups ni parar
+		// el bulk. Se registra en consola y se cuenta en el resumen final.
+		trace.err.withContext(`Failed to download`)(err);
+		return false;
+	}
 };
 
 export { Settings } from "./Settings";
@@ -159,6 +169,7 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 		try {
 			for await (const mediaItem of await mediaCollection.mediaItems()) {
 				if (downloadState.cancel) break;
+				if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
 				await downloadMediaItem(mediaItem, downloadFolder, downloadButton);
 			}
 		} finally {
@@ -209,6 +220,8 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 				return;
 			}
 
+			let ok = 0;
+			let failed = 0;
 			for (let i = 0; i < albums.length && !downloadState.cancel; i++) {
 				const album = await Album.fromId(albums[i].id).catch(() => undefined);
 				if (album === undefined) continue;
@@ -216,17 +229,19 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 				let j = 0;
 				for await (const mediaItem of await album.mediaItems()) {
 					if (downloadState.cancel) break;
+					if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
 					j++;
 					const prefix = `[${i + 1}/${albums.length} · ${j}] `;
-					await downloadMediaItem(mediaItem, folder, artistButton, prefix).catch(
-						trace.msg.err.withContext(`Artist download (album ${albums[i].title})`),
-					);
+					const success = await downloadMediaItem(mediaItem, folder, artistButton, prefix);
+					if (success) ok++;
+					else failed++;
 					if (downloadState.cancel) break;
 					if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
 				}
 				if (!downloadState.cancel && settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
 			}
-			artistButton.text = downloadState.cancel ? `Stopped` : `Done`;
+			const summary = `${ok} ok${failed ? `, ${failed} failed` : ""}`;
+			artistButton.text = downloadState.cancel ? `Stopped (${summary})` : `Done — ${summary}`;
 		} finally {
 			downloadState.active = false;
 			downloadState.cancel = false;
