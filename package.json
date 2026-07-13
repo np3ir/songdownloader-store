@@ -1,6 +1,16 @@
 {
 	"name": "@elvigilante/songdownloader-store",
 	"description": "Luna plugin store: Song Downloader (ElVigilante) — Tidal downloads as FLAC with a custom tagging convention.",
+	"homepage": "https://github.com/np3ir/songdownloader-store",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/np3ir/songdownloader-store.git"
+	},
+	"author": {
+		"name": "ElVigilante",
+		"url": "https://github.com/np3ir",
+		"avatarUrl": "https://avatars.githubusercontent.com/u/53929508?v=4"
+	},
 	"type": "module",
 	"scripts": {
 		"watch": "concurrently \"pnpm:build --watch\" pnpm:serve",

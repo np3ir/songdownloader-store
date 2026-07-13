@@ -1,11 +1,11 @@
 {
 	"name": "SongDownloader ElVigilante",
-	"description": "Download Tidal songs as FLAC with the user's own tagging convention (ported from their tiddl-elvigilante fork, not upstream tiddl): artist separator, featured from /contributors, .lrc sidecar and fullwidth sanitization.",
+	"description": "Download Tidal songs as FLAC with a custom tagging convention: artist separator, featured from /contributors, .lrc sidecar, fullwidth sanitization, {artist_initials} folder and optional track-number padding. Fork of Inrixia/luna-plugins (SongDownloader).",
 	"homepage": "https://github.com/np3ir/songdownloader-store",
 	"author": {
-		"name": "Inrixia (fork: ElVigilante)",
-		"url": "https://github.com/Inrixia",
-		"avatarUrl": "https://2.gravatar.com/avatar/eeaffef9eb9b436dccc58c6c44c9fe8c3528e83e3bf64e1c736a68dbe8c097d3"
+		"name": "ElVigilante",
+		"url": "https://github.com/np3ir",
+		"avatarUrl": "https://avatars.githubusercontent.com/u/53929508?v=4"
 	},
 	"main": "./src/index.ts",
 	"dependencies": {
