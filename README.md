@@ -1,6 +1,6 @@
 # Song Downloader (ElVigilante) — Luna Plugin Store
 
-A [Tidal Luna](https://github.com/Inrixia/TidaLuna) plugin store containing **Song Downloader (ElVigilante)**, a fork of Inrixia's [SongDownloader](https://github.com/Inrixia/luna-plugins) that downloads TIDAL songs as FLAC using a custom tagging/naming convention.
+A [Tidal Luna](https://github.com/Inrixia/TidaLuna) plugin store containing **SongDownloader ElVigilante**, a fork of Inrixia's [SongDownloader](https://github.com/Inrixia/luna-plugins) that downloads TIDAL songs as FLAC using a custom tagging/naming convention.
 
 > This is a personal fork. Naming/tagging conventions here are my own modifications, **not** features of the original SongDownloader or of tiddl.
 
@@ -14,7 +14,7 @@ A [Tidal Luna](https://github.com/Inrixia/TidaLuna) plugin store containing **So
    https://github.com/np3ir/songdownloader-store/releases/download/latest/store.json
    ```
 
-4. Install **Song Downloader (ElVigilante)** from the store.
+4. Install **SongDownloader ElVigilante** from the store.
 5. If you have the original *Song Downloader* installed, remove it (both add a download button to the context menu).
 
 Then right-click any track, album or playlist → **Download N tracks**.

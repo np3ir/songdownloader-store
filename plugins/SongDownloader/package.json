@@ -1,5 +1,5 @@
 {
-	"name": "Song Downloader (ElVigilante)",
+	"name": "SongDownloader ElVigilante",
 	"description": "Download Tidal songs as FLAC with the user's own tagging convention (ported from their tiddl-elvigilante fork, not upstream tiddl): artist separator, featured from /contributors, .lrc sidecar and fullwidth sanitization.",
 	"homepage": "https://github.com/np3ir/songdownloader-store",
 	"author": {
