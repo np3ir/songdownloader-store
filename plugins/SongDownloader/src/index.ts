@@ -208,8 +208,34 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 		}
 	});
 
-	await artistButton.show(contextMenu);
+	const artistElem = await artistButton.show(contextMenu);
+	enableClonedButton(artistElem);
 });
+
+/**
+ * El ContextMenuButton clona un ítem del menú; en el menú de artista ese ítem
+ * viene "disabled" y el clon hereda el estilo gris. Le quitamos el estado
+ * disabled (atributo + aria + dimming inline) para que se vea/comporte como
+ * los demás ítems. El onclick ya funciona; esto es solo cosmético.
+ */
+const enableClonedButton = (span: HTMLElement | undefined) => {
+	if (!(span instanceof HTMLElement)) return;
+	const nodes: (Element | null | undefined)[] = [
+		span,
+		span.closest("button"),
+		span.closest('div[data-type="contextmenu-item"]'),
+		span.parentElement,
+		span.parentElement?.parentElement,
+	];
+	for (const node of nodes) {
+		if (!(node instanceof HTMLElement)) continue;
+		if (node instanceof HTMLButtonElement) node.disabled = false;
+		node.removeAttribute("disabled");
+		node.removeAttribute("aria-disabled");
+		node.style.opacity = "";
+		node.style.pointerEvents = "";
+	}
+};
 
 // Alias de tipo local para el id del evento (redux.ItemId sin importar todo redux).
 type redux_ItemId = string | number;
