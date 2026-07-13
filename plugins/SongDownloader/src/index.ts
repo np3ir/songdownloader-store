@@ -70,9 +70,10 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	const mainAlbumArtist = album?.tidalAlbum.artist?.name ?? (Array.isArray(tags.albumArtist) ? tags.albumArtist[0] : tags.albumArtist);
 	if (mainAlbumArtist) tags.albumArtist = [mainAlbumArtist];
 
-	// 3d. {album} = título RAW de TIDAL (no el de MusicBrainz que Luna prefiere).
+	// 3d. {album} = título RAW de TIDAL (no el de MusicBrainz que Luna prefiere),
+	//     quitándole "(Explicit)"/"(E)" como hace tiddl (generate_template_data).
 	const rawAlbumTitle = album?.tidalAlbum.title ?? mediaItem.tidalItem.album?.title;
-	if (rawAlbumTitle) tags.album = rawAlbumTitle;
+	if (rawAlbumTitle) tags.album = rawAlbumTitle.replace(/\s*\(\s*(?:Explicit|E)\s*\)/gi, "").trim();
 
 	// 4. Nombre de archivo (fullwidth + separador + cap + padding + multidisco)
 	setText(`Fetching filename...`);
@@ -85,6 +86,7 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 		discSubfolder: settings.discSubfolder,
 		numberOfVolumes: album?.tidalAlbum.numberOfVolumes ?? 1,
 		volumeNumber: mediaItem.tidalItem.volumeNumber ?? 1,
+		explicit: mediaItem.tidalItem.explicit ?? false,
 	});
 
 	// 5. Ruta destino

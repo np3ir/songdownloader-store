@@ -34,6 +34,8 @@ export type FileNameOpts = {
 	numberOfVolumes: number;
 	/** Volumen/disco de ESTE track. */
 	volumeNumber: number;
+	/** El track es explícito (para el placeholder {explicit}). */
+	explicit: boolean;
 };
 
 /**
@@ -82,6 +84,10 @@ export const buildFileName = (
 		fileName = fileName.split("{trackNumber}").join(sanitize(trackValue));
 	}
 
+	// {explicit}: " (explicit)" para tracks explícitos, "" si no. Réplica exacta
+	// de tiddl {item.explicit:shortparens} (que devuelve " (explicit)").
+	fileName = fileName.split("{explicit}").join(opts.explicit ? " (explicit)" : "");
+
 	// Resto de placeholders
 	for (const [tag, raw] of Object.entries(tags)) {
 		if (tag === "artist" || tag === "albumArtist" || tag === "trackNumber") continue;
@@ -100,6 +106,19 @@ export const buildFileName = (
 		parts.splice(parts.length - 1, 0, discPart); // inserta antes del último segmento (el archivo)
 		fileName = parts.join("/");
 	}
+
+	// Limpieza final POR SEGMENTO (como tiddl, que sanitiza cada segmento renderizado):
+	// colapsa espacios múltiples (p.ej. los que deja el marcador {explicit}), quita el
+	// espacio sobrante antes de la extensión y recorta cada segmento.
+	fileName = fileName
+		.split("/")
+		.map((seg) =>
+			seg
+				.replace(/\s+/g, " ")
+				.replace(/\s+(\.[^.\/]+)$/, "$1")
+				.trim(),
+		)
+		.join("/");
 
 	return fileName;
 };

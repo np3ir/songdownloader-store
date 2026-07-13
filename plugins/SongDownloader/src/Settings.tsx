@@ -12,7 +12,8 @@ import { LunaButtonSetting, LunaSelectItem, LunaSelectSetting, LunaSettings, Lun
 import React from "react";
 import { getDownloadFolder } from "./helpers";
 
-const defaultFilenameFormat = "{artist} - {album} - {title}";
+// Default alineado con el template de tiddl del usuario (config.toml [templates].default)
+const defaultFilenameFormat = "{artist_initials}/{albumArtist}/({year}) {album}/{trackNumber}. {artist} - {title}{explicit}";
 const DEFAULT_ARTIST_SEPARATOR = " / "; // DEFAULT_ARTIST_SEPARATOR del fork tiddl-elvigilante
 const DEFAULT_MAX_ARTISTS_IN_NAME = 3; // MAX_ARTISTS_IN_NAME del fork tiddl-elvigilante
 const DEFAULT_TRACK_NUMBER_PADDING = 2; // {trackNumber} -> "01." (0 = sin padding)
@@ -49,8 +50,8 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	discSubfolder: true,
 	artistIncludeSingles: true,
 	artistDedup: true,
-	artistTrackDelay: 2,
-	artistAlbumDelay: 5,
+	artistTrackDelay: 5, // = tiddl track_delay
+	artistAlbumDelay: 10, // = tiddl artist_delay
 });
 
 // Sanitize download quality
@@ -128,6 +129,9 @@ export const Settings = () => {
 						<ul>
 							<li key="artist_initials">
 								<b>artist_initials</b> — album artist's initial folder (A–Z, or # for other). E.g. {"{artist_initials}/{albumArtist}/..."} → <b>A/Alex Bueno/...</b>
+							</li>
+							<li key="explicit">
+								<b>explicit</b> — appends <b>{" (explicit)"}</b> for explicit tracks, nothing otherwise (tiddl's explicit marker).
 							</li>
 							{MediaItem.availableTags.map((tag) => (
 								<li key={tag}>{tag}</li>
