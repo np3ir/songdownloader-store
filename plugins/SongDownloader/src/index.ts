@@ -78,6 +78,13 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 				album?.tidalAlbum.artist?.name ?? (Array.isArray(tags.albumArtist) ? tags.albumArtist[0] : tags.albumArtist);
 			if (mainAlbumArtist) tags.albumArtist = [mainAlbumArtist];
 
+			// 3d. {album} = título RAW de TIDAL. Luna prefiere el título de
+			//     MusicBrainz en album.title() (p.ej. "Nº1"), pero eso no coincide
+			//     con lo que muestra TIDAL ("Numero 1") ni con los títulos de track
+			//     (que ya usan el crudo). Igual que tiddl, usamos el título de TIDAL.
+			const rawAlbumTitle = album?.tidalAlbum.title ?? mediaItem.tidalItem.album?.title;
+			if (rawAlbumTitle) tags.album = rawAlbumTitle;
+
 			// 4. Nombre de archivo (fullwidth + separador + cap de artistas)
 			downloadButton.text = `Fetching filename...`;
 			const ext = await mediaItem.fileExtension(settings.downloadQuality);
