@@ -30,6 +30,11 @@ type Settings = {
 	maxArtistsInName: number;
 	trackNumberPadding: number;
 	discSubfolder: boolean;
+	// Descarga de artista completo
+	artistIncludeSingles: boolean;
+	artistDedup: boolean;
+	artistTrackDelay: number;
+	artistAlbumDelay: number;
 };
 export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDownloader", {
 	downloadQuality: Quality.Max.audioQuality,
@@ -42,6 +47,10 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	maxArtistsInName: DEFAULT_MAX_ARTISTS_IN_NAME,
 	trackNumberPadding: DEFAULT_TRACK_NUMBER_PADDING,
 	discSubfolder: true,
+	artistIncludeSingles: true,
+	artistDedup: true,
+	artistTrackDelay: 2,
+	artistAlbumDelay: 5,
 });
 
 // Sanitize download quality
@@ -49,6 +58,8 @@ if (Quality.fromAudioQuality(settings.downloadQuality) === undefined) settings.d
 // Sanitize numeric settings (ReactiveStore may hydrate an old install without them)
 if (!Number.isFinite(settings.maxArtistsInName) || settings.maxArtistsInName < 1) settings.maxArtistsInName = DEFAULT_MAX_ARTISTS_IN_NAME;
 if (!Number.isFinite(settings.trackNumberPadding) || settings.trackNumberPadding < 0) settings.trackNumberPadding = DEFAULT_TRACK_NUMBER_PADDING;
+if (!Number.isFinite(settings.artistTrackDelay) || settings.artistTrackDelay < 0) settings.artistTrackDelay = 2;
+if (!Number.isFinite(settings.artistAlbumDelay) || settings.artistAlbumDelay < 0) settings.artistAlbumDelay = 5;
 
 export const Settings = () => {
 	const [downloadQuality, setDownloadQuality] = React.useState(settings.downloadQuality);
@@ -62,6 +73,10 @@ export const Settings = () => {
 	const [maxArtistsInName, setMaxArtistsInName] = React.useState(String(settings.maxArtistsInName));
 	const [trackNumberPadding, setTrackNumberPadding] = React.useState(String(settings.trackNumberPadding));
 	const [discSubfolder, setDiscSubfolder] = React.useState(settings.discSubfolder);
+	const [artistIncludeSingles, setArtistIncludeSingles] = React.useState(settings.artistIncludeSingles);
+	const [artistDedup, setArtistDedup] = React.useState(settings.artistDedup);
+	const [artistTrackDelay, setArtistTrackDelay] = React.useState(String(settings.artistTrackDelay));
+	const [artistAlbumDelay, setArtistAlbumDelay] = React.useState(String(settings.artistAlbumDelay));
 
 	return (
 		<LunaSettings>
@@ -191,6 +206,40 @@ export const Settings = () => {
 				desc={<>Write synced lyrics to a <b>.lrc</b> file next to the track when available.</>}
 				value={saveLrc}
 				onChange={(_, checked) => setSaveLrc((settings.saveLrc = checked))}
+			/>
+			<LunaSwitchSetting
+				title="Artist download · include EPs & singles"
+				desc={<>When downloading a whole artist (right-click an artist), also fetch their EPs and singles, not just albums.</>}
+				value={artistIncludeSingles}
+				onChange={(_, checked) => setArtistIncludeSingles((settings.artistIncludeSingles = checked))}
+			/>
+			<LunaSwitchSetting
+				title="Artist download · deduplicate editions"
+				desc={<>Collapse multiple editions of the same album (same title/type/version) and keep the highest quality one. Recommended.</>}
+				value={artistDedup}
+				onChange={(_, checked) => setArtistDedup((settings.artistDedup = checked))}
+			/>
+			<LunaTextSetting
+				title="Artist download · delay between tracks (s)"
+				desc={<>Max random pause (seconds) between tracks during a full-artist download, to avoid hammering TIDAL. <b>0</b> = no delay.</>}
+				value={artistTrackDelay}
+				onChange={(e) => {
+					const raw = e.target.value;
+					setArtistTrackDelay(raw);
+					const n = parseFloat(raw);
+					if (Number.isFinite(n) && n >= 0) settings.artistTrackDelay = n;
+				}}
+			/>
+			<LunaTextSetting
+				title="Artist download · delay between albums (s)"
+				desc={<>Max random pause (seconds) between albums during a full-artist download. <b>0</b> = no delay.</>}
+				value={artistAlbumDelay}
+				onChange={(e) => {
+					const raw = e.target.value;
+					setArtistAlbumDelay(raw);
+					const n = parseFloat(raw);
+					if (Number.isFinite(n) && n >= 0) settings.artistAlbumDelay = n;
+				}}
 			/>
 		</LunaSettings>
 	);

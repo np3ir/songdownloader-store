@@ -28,6 +28,7 @@ Then right-click any track, album or playlist → **Download N tracks**.
 - **`{artist_initials}` placeholder** — alpha-bucket folder (`A/Artist/…`, `#` for non-letters).
 - **Optional track-number padding** — zero-pad `{trackNumber}` (e.g. `01.`); set to `0` to disable.
 - **Multi-disc handling** — albums with more than one volume auto-get a `Disc N` subfolder (unless your Path format already uses `{discNumber}`), so discs don't interleave. Toggleable.
+- **Full-artist download** — right-click an artist → **Download artist** grabs the whole discography (albums, optionally EPs & singles), with edition dedup (keeps the best-quality version of each album) and configurable pacing (delays between tracks/albums) to stay gentle on TIDAL.
 - **Album-artist normalization** — the album folder uses the primary album artist and the album's own release date, so compilations don't fragment into multiple year folders.
 - **m4a tagging** — tracks that download as m4a (AAC/DASH) get tagged too (via `node-taglib-sharp`), not just FLAC.
 
