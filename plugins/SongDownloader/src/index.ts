@@ -86,6 +86,9 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 				useFullwidth: settings.useFullwidth,
 				maxArtistsInName: settings.maxArtistsInName,
 				trackNumberPadding: settings.trackNumberPadding,
+				discSubfolder: settings.discSubfolder,
+				numberOfVolumes: album?.tidalAlbum.numberOfVolumes ?? 1,
+				volumeNumber: mediaItem.tidalItem.volumeNumber ?? 1,
 			});
 
 			// 5. Ruta destino

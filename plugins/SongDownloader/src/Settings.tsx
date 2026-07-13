@@ -29,6 +29,7 @@ type Settings = {
 	saveLrc: boolean;
 	maxArtistsInName: number;
 	trackNumberPadding: number;
+	discSubfolder: boolean;
 };
 export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDownloader", {
 	downloadQuality: Quality.Max.audioQuality,
@@ -40,6 +41,7 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	saveLrc: true,
 	maxArtistsInName: DEFAULT_MAX_ARTISTS_IN_NAME,
 	trackNumberPadding: DEFAULT_TRACK_NUMBER_PADDING,
+	discSubfolder: true,
 });
 
 // Sanitize download quality
@@ -59,6 +61,7 @@ export const Settings = () => {
 	const [saveLrc, setSaveLrc] = React.useState(settings.saveLrc);
 	const [maxArtistsInName, setMaxArtistsInName] = React.useState(String(settings.maxArtistsInName));
 	const [trackNumberPadding, setTrackNumberPadding] = React.useState(String(settings.trackNumberPadding));
+	const [discSubfolder, setDiscSubfolder] = React.useState(settings.discSubfolder);
 
 	return (
 		<LunaSettings>
@@ -159,6 +162,17 @@ export const Settings = () => {
 					const n = parseInt(raw, 10);
 					if (Number.isFinite(n) && n >= 0) settings.trackNumberPadding = n;
 				}}
+			/>
+			<LunaSwitchSetting
+				title="Disc subfolder for multi-disc albums"
+				desc={
+					<>
+						On albums with more than one disc (volume), add a <b>Disc N</b> folder before the file so tracks
+						from different discs don't mix. Skipped if your Path format already uses <b>{"{discNumber}"}</b>.
+					</>
+				}
+				value={discSubfolder}
+				onChange={(_, checked) => setDiscSubfolder((settings.discSubfolder = checked))}
 			/>
 			<LunaSwitchSetting
 				title="Fullwidth sanitization"

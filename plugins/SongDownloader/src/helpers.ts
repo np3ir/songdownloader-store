@@ -28,6 +28,12 @@ export type FileNameOpts = {
 	maxArtistsInName: number;
 	/** Ancho de zero-pad para {trackNumber} (0 = sin padding). */
 	trackNumberPadding: number;
+	/** Auto-inyectar carpeta "Disc N" en álbumes multidisco. */
+	discSubfolder: boolean;
+	/** Nº de volúmenes/discos del álbum (>1 = multidisco). */
+	numberOfVolumes: number;
+	/** Volumen/disco de ESTE track. */
+	volumeNumber: number;
 };
 
 /**
@@ -82,6 +88,17 @@ export const buildFileName = (
 		const value = Array.isArray(raw) ? raw[0] : raw;
 		if (value === undefined || value === null) continue;
 		fileName = fileName.split(`{${tag}}`).join(sanitize(String(value)));
+	}
+
+	// Multidisco: si el álbum tiene >1 volumen y el template NO maneja el disco
+	// explícitamente ({discNumber}), inyecta una carpeta "Disc N" antes del archivo
+	// para que el disco 1 track 1 y el disco 2 track 1 no se mezclen. Paridad con
+	// tiddl (auto-inject disc folder por numberOfVolumes).
+	if (opts.discSubfolder && opts.numberOfVolumes > 1 && !pathFormat.includes("{discNumber}")) {
+		const parts = fileName.split("/");
+		const discPart = sanitize(`Disc ${opts.volumeNumber || 1}`);
+		parts.splice(parts.length - 1, 0, discPart); // inserta antes del último segmento (el archivo)
+		fileName = parts.join("/");
 	}
 
 	return fileName;
