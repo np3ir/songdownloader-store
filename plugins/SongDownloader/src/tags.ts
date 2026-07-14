@@ -58,6 +58,9 @@ export const foldAccents = (s: string): string => s.normalize("NFKD").replace(/\
 export const sanitizeFullwidth = (value: string): string => {
 	if (!value) return "";
 	let s = value.normalize("NFC");
+	// Normaliza guiones Unicode lookalike a "-" (U+2010..U+2015, U+2212) para que
+	// TIDAL "Z‐Sides" y "Z-Sides" produzcan el MISMO archivo, igual que tiddl.
+	s = s.replace(/[‐-―−]/gu, "-");
 	// Quita controles/format/surrogate (el fork elimina categorías Cc/Cf/Cs)
 	s = s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "");
 	// Regla principal: caracteres prohibidos -> ancho completo
