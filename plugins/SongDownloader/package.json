@@ -9,6 +9,7 @@
 	},
 	"main": "./src/index.ts",
 	"dependencies": {
+		"mediabunny": "^1.50.8",
 		"node-taglib-sharp": "^6.0.3"
 	}
 }

@@ -14,6 +14,7 @@ import { join, parse } from "path";
 import { pipeline } from "stream/promises";
 
 import { tagM4a } from "./m4a.native";
+import { remuxToProgressive } from "./remux.native";
 
 /**
  * Descarga con tags custom. Replica lib/MediaItem.download.native.ts pero
@@ -109,9 +110,13 @@ export const downloadTrack = async (
 			throw err;
 		}
 
-		// m4a: el stream salió sin tags, los escribimos ahora (best-effort)
+		// m4a: el stream DASH sale como MP4 FRAGMENTADO y sin tags. Primero remux
+		// a MP4 progresivo (lossless, preserva encoder delay/gapless — sin esto
+		// taglib revienta y el archivo quedaba SIN tags), después los tags custom.
 		if (!isFlac) {
-			await tagM4a(finalPath, tags, coverUrl).catch(() => {});
+			await remuxToProgressive(finalPath)
+				.then(() => tagM4a(finalPath, tags, coverUrl))
+				.catch(() => {});
 		}
 
 		if (lrc && lrc.trim().length > 0) {
