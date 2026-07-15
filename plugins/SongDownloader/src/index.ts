@@ -6,7 +6,7 @@
  *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
  */
 import { Tracer, type LunaUnload } from "@luna/core";
-import { Album, ContextMenu, MediaItem, Playlist, safeInterval, StyleTag } from "@luna/lib";
+import { ContextMenu, MediaItem, Playlist, safeInterval, StyleTag, TidalApi, type redux } from "@luna/lib";
 
 import { buildFileName, getDownloadFolder, getDownloadPath } from "./helpers";
 import { getFeaturedContributors } from "./contributors";
@@ -144,6 +144,30 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	}
 };
 
+type AlbumItemsResponse = { items?: redux.MediaItem[]; totalNumberOfItems?: number; limit?: number; offset?: number };
+
+/**
+ * Tracks de un álbum vía `albums/{id}/items` (paginado) con el countryCode REAL
+ * de la sesión. NO se usa Album.mediaItems() del core: su TidalApi.albumItems
+ * pega a pages/album con countryCode=NZ hardcodeado y devuelve undefined para
+ * álbumes no licenciados en NZ — el álbum se saltaría en silencio.
+ */
+const albumTMediaItems = async (albumId: redux_ItemId): Promise<redux.MediaItem[]> => {
+	const all: redux.MediaItem[] = [];
+	let offset = 0;
+	while (true) {
+		const page = await TidalApi.fetch<AlbumItemsResponse>(
+			`https://desktop.tidal.com/v1/albums/${albumId}/items?${TidalApi.queryArgs()}&limit=100&offset=${offset}`,
+		).catch(trace.err.withContext(`albumTMediaItems(${albumId})`));
+		const items = page?.items ?? [];
+		all.push(...items);
+		const total = page?.totalNumberOfItems ?? 0;
+		offset += page?.limit ?? 100;
+		if (items.length === 0 || offset >= total) break;
+	}
+	return all;
+};
+
 /**
  * Descarga una lista de álbumes completos (por id) a `folder`, con contadores,
  * delays anti-bot y cancelación. Reusado por la descarga de artista completo y
@@ -153,11 +177,11 @@ const downloadAlbumList = async (albumIds: redux_ItemId[], folder: string, butto
 	let ok = 0;
 	let failed = 0;
 	for (let i = 0; i < albumIds.length && !downloadState.cancel; i++) {
-		const album = await Album.fromId(albumIds[i]).catch(() => undefined);
-		if (album === undefined) continue;
+		const tItems = await albumTMediaItems(albumIds[i]);
+		if (tItems.length === 0) continue; // álbum muerto en catálogo (404) o vacío
 
 		let j = 0;
-		for await (const mediaItem of await album.mediaItems()) {
+		for await (const mediaItem of MediaItem.fromTMediaItems(tItems)) {
 			if (downloadState.cancel) break;
 			if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
 			j++;
@@ -235,12 +259,13 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 			fullAlbumsButton.elem.classList.add("download-button");
 			try {
 				fullAlbumsButton.text = `Collecting albums...`;
+				// Items CRUDOS de la playlist (tMediaItems): el id de álbum ya viene en
+				// cada track, sin construir un MediaItem (+fetch de calidad) por track.
 				const albumIds: redux_ItemId[] = [];
 				const seen = new Set<redux_ItemId>();
-				for await (const mediaItem of await mediaCollection.mediaItems()) {
-					if (downloadState.cancel) break;
-					if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
-					const albumId = mediaItem.tidalItem.album?.id;
+				for (const tItem of await mediaCollection.tMediaItems()) {
+					if (tItem?.type !== "track") continue; // saltar videos (no soportados)
+					const albumId = tItem.item.album?.id;
 					if (albumId === undefined || seen.has(albumId)) continue;
 					seen.add(albumId);
 					albumIds.push(albumId);
