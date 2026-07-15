@@ -6,7 +6,7 @@
  *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
  */
 import { Tracer, type LunaUnload } from "@luna/core";
-import { Album, ContextMenu, MediaItem, safeInterval, StyleTag } from "@luna/lib";
+import { Album, ContextMenu, MediaItem, Playlist, safeInterval, StyleTag } from "@luna/lib";
 
 import { buildFileName, getDownloadFolder, getDownloadPath } from "./helpers";
 import { getFeaturedContributors } from "./contributors";
@@ -144,10 +144,40 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	}
 };
 
+/**
+ * Descarga una lista de álbumes completos (por id) a `folder`, con contadores,
+ * delays anti-bot y cancelación. Reusado por la descarga de artista completo y
+ * por el botón "Download full albums" de playlists.
+ */
+const downloadAlbumList = async (albumIds: redux_ItemId[], folder: string, button: Button): Promise<{ ok: number; failed: number }> => {
+	let ok = 0;
+	let failed = 0;
+	for (let i = 0; i < albumIds.length && !downloadState.cancel; i++) {
+		const album = await Album.fromId(albumIds[i]).catch(() => undefined);
+		if (album === undefined) continue;
+
+		let j = 0;
+		for await (const mediaItem of await album.mediaItems()) {
+			if (downloadState.cancel) break;
+			if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
+			j++;
+			const prefix = `[${i + 1}/${albumIds.length} · ${j}] `;
+			const success = await downloadMediaItem(mediaItem, folder, button, prefix);
+			if (success) ok++;
+			else failed++;
+			if (downloadState.cancel) break;
+			if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
+		}
+		if (!downloadState.cancel && settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
+	}
+	return { ok, failed };
+};
+
 export { Settings } from "./Settings";
 
 // ── Descarga de colección: track / álbum / playlist ──────────────────────────
 const downloadButton = ContextMenu.addButton(unloads);
+const fullAlbumsButton = ContextMenu.addButton(unloads);
 ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 	const trackCount = await mediaCollection.count();
 	if (trackCount === 0) return;
@@ -181,6 +211,59 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 	});
 
 	await downloadButton.show(contextMenu);
+
+	// Botón adicional SOLO para playlists: descargar los álbumes COMPLETOS a los
+	// que pertenecen los tracks de la playlist (issue #130 de luna-plugins).
+	if (mediaCollection instanceof Playlist) {
+		const albumsDefaultText = (fullAlbumsButton.text = `Download full albums`);
+
+		fullAlbumsButton.onClick(async () => {
+			if (fullAlbumsButton.elem === undefined) return;
+			// Re-click mientras hay una descarga en curso = detenerla.
+			if (downloadState.active) {
+				downloadState.cancel = true;
+				fullAlbumsButton.text = `Stopping...`;
+				return;
+			}
+			// Siempre carpeta base: una playlist de N tracks puede convertirse en N
+			// álbumes (cientos de tracks); nunca preguntar ruta por cada uno.
+			const folder = settings.defaultPath ?? (await getDownloadFolder());
+			if (folder === undefined) return;
+
+			downloadState.active = true;
+			downloadState.cancel = false;
+			fullAlbumsButton.elem.classList.add("download-button");
+			try {
+				fullAlbumsButton.text = `Collecting albums...`;
+				const albumIds: redux_ItemId[] = [];
+				const seen = new Set<redux_ItemId>();
+				for await (const mediaItem of await mediaCollection.mediaItems()) {
+					if (downloadState.cancel) break;
+					if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
+					const albumId = mediaItem.tidalItem.album?.id;
+					if (albumId === undefined || seen.has(albumId)) continue;
+					seen.add(albumId);
+					albumIds.push(albumId);
+				}
+
+				if (albumIds.length === 0) {
+					fullAlbumsButton.text = `No albums found`;
+					return;
+				}
+
+				const { ok, failed } = await downloadAlbumList(albumIds, folder, fullAlbumsButton);
+				const summary = `${ok} ok${failed ? `, ${failed} failed` : ""}`;
+				fullAlbumsButton.text = downloadState.cancel ? `Stopped (${summary})` : `Done — ${summary}`;
+			} finally {
+				downloadState.active = false;
+				downloadState.cancel = false;
+				fullAlbumsButton.elem?.classList.remove("download-button");
+				setTimeout(() => (fullAlbumsButton.text = albumsDefaultText), 3000);
+			}
+		});
+
+		await fullAlbumsButton.show(contextMenu);
+	}
 });
 
 // ── Descarga de ARTISTA completo ─────────────────────────────────────────────
@@ -220,26 +303,11 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 				return;
 			}
 
-			let ok = 0;
-			let failed = 0;
-			for (let i = 0; i < albums.length && !downloadState.cancel; i++) {
-				const album = await Album.fromId(albums[i].id).catch(() => undefined);
-				if (album === undefined) continue;
-
-				let j = 0;
-				for await (const mediaItem of await album.mediaItems()) {
-					if (downloadState.cancel) break;
-					if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
-					j++;
-					const prefix = `[${i + 1}/${albums.length} · ${j}] `;
-					const success = await downloadMediaItem(mediaItem, folder, artistButton, prefix);
-					if (success) ok++;
-					else failed++;
-					if (downloadState.cancel) break;
-					if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
-				}
-				if (!downloadState.cancel && settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
-			}
+			const { ok, failed } = await downloadAlbumList(
+				albums.map((a) => a.id),
+				folder,
+				artistButton,
+			);
 			const summary = `${ok} ok${failed ? `, ${failed} failed` : ""}`;
 			artistButton.text = downloadState.cancel ? `Stopped (${summary})` : `Done — ${summary}`;
 		} finally {
