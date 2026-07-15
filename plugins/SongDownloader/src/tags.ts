@@ -99,14 +99,34 @@ export const orderArtists = (
 	featuredExtra: string[] = [],
 ): { all: string[]; main: string[]; featured: string[] } => {
 	const clean = (n: string) => n.trim();
-	const main = artists
-		.filter((a) => a.type !== "FEATURED")
-		.map((a) => clean(a.name))
-		.filter(Boolean);
-	const featured = artists
-		.filter((a) => a.type === "FEATURED")
-		.map((a) => clean(a.name))
-		.filter(Boolean);
+	// Clave de comparación: sin acentos, sin mayúsculas, espacios colapsados —
+	// "Rosalia" y "ROSALÍA" son el mismo artista (paridad con el dedup_artists
+	// de tiddl-elvigilante y streamrip-elvigilante).
+	const normKey = (n: string) => foldAccents(n.toLowerCase()).replace(/\s+/g, " ").trim();
+	const dedupNames = (names: string[], exclude: string[] = []): string[] => {
+		const seen = new Set(exclude.map(normKey));
+		const out: string[] = [];
+		for (const n of names) {
+			const k = normKey(n);
+			if (seen.has(k)) continue;
+			seen.add(k);
+			out.push(n); // conserva la PRIMERA grafía vista
+		}
+		return out;
+	};
+	const main = dedupNames(
+		artists
+			.filter((a) => a.type !== "FEATURED")
+			.map((a) => clean(a.name))
+			.filter(Boolean),
+	);
+	const featured = dedupNames(
+		artists
+			.filter((a) => a.type === "FEATURED")
+			.map((a) => clean(a.name))
+			.filter(Boolean),
+		main,
+	);
 
 	// Fusiona featured extra de /contributors con dedup (enrich_track_artists del fork)
 	const known = new Set<string>([...main, ...featured].map((n) => foldAccents(n.toLowerCase())));
