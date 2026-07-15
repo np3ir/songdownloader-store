@@ -491,6 +491,12 @@ const enableClonedButton = (span: HTMLElement | undefined) => {
 		node.removeAttribute("aria-disabled");
 		node.style.opacity = "";
 		node.style.pointerEvents = "";
+		// El gris real viene de una CLASE de TIDAL (p.ej. _actionItemDisabled_bb3797d,
+		// opacity 0.5 vía CSS) que los atributos/inline no tocan. El hash del
+		// sufijo cambia entre versiones — matchear por nombre parcial.
+		for (const cls of [...node.classList]) {
+			if (/disabled/i.test(cls)) node.classList.remove(cls);
+		}
 	}
 };
 
