@@ -37,6 +37,10 @@ type Settings = {
 	artistDedup: boolean;
 	artistTrackDelay: number;
 	artistAlbumDelay: number;
+	// Reiniciar TIDAL al terminar un bulk si la memoria quedó alta (la
+	// acumulación del core de Luna en descargas largas dispara el guard de
+	// Chromium, que recarga la página y tumba la inyección de Luna)
+	restartAfterBulk: boolean;
 };
 export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDownloader", {
 	downloadQuality: Quality.Max.audioQuality,
@@ -53,6 +57,7 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	artistDedup: true,
 	artistTrackDelay: 5, // = tiddl track_delay
 	artistAlbumDelay: 10, // = tiddl artist_delay
+	restartAfterBulk: true,
 });
 
 // Sanitize download quality
@@ -77,6 +82,7 @@ export const Settings = () => {
 	const [discSubfolder, setDiscSubfolder] = React.useState(settings.discSubfolder);
 	const [artistIncludeSingles, setArtistIncludeSingles] = React.useState(settings.artistIncludeSingles);
 	const [artistDedup, setArtistDedup] = React.useState(settings.artistDedup);
+	const [restartAfterBulk, setRestartAfterBulk] = React.useState(settings.restartAfterBulk);
 	const [artistTrackDelay, setArtistTrackDelay] = React.useState(String(settings.artistTrackDelay));
 	const [artistAlbumDelay, setArtistAlbumDelay] = React.useState(String(settings.artistAlbumDelay));
 
@@ -257,6 +263,17 @@ export const Settings = () => {
 					const n = parseFloat(raw);
 					if (Number.isFinite(n) && n >= 0) settings.artistAlbumDelay = n;
 				}}
+			/>
+			<LunaSwitchSetting
+				title="Restart TIDAL after big downloads"
+				desc={
+					<>
+						When a bulk download finishes and memory usage is high, restart TIDAL automatically (frees memory buildup and reloads Luna
+						cleanly). Skipped if another download is running.
+					</>
+				}
+				value={restartAfterBulk}
+				onChange={(_, checked) => setRestartAfterBulk((settings.restartAfterBulk = checked))}
 			/>
 		</LunaSettings>
 	);

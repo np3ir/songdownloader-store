@@ -6,7 +6,11 @@
  *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
  */
 import type { PlaybackInfo } from "@luna/lib";
-import { fetchMediaItemStream, type FetchProgress } from "@luna/lib.native";
+import { fetchMediaItemStream, relaunch, type FetchProgress } from "@luna/lib.native";
+
+/** Reinicio completo del app (main process relaunch). Además de liberar la
+ * memoria acumulada, recarga la inyección de Luna limpia. */
+export const restartApp = async (): Promise<void> => relaunch();
 
 import { createWriteStream } from "fs";
 import { access, constants, mkdir, unlink, writeFile } from "fs/promises";

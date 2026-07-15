@@ -6,15 +6,49 @@
  *  © ElVigilante · AGPL-3.0 · fork of Inrixia/luna-plugins (SongDownloader)
  */
 import { Tracer, type LunaUnload } from "@luna/core";
-import { ContextMenu, MediaItem, Playlist, safeInterval, StyleTag, TidalApi, type redux } from "@luna/lib";
+import { ContentBase, ContextMenu, MediaItem, Playlist, safeInterval, StyleTag, TidalApi, type redux } from "@luna/lib";
 
 import { buildFileName, getDownloadFolder, getDownloadPath } from "./helpers";
 import { getFeaturedContributors } from "./contributors";
 import { cleanTitle, orderArtists } from "./tags";
 import { dedupAlbums, getArtistAlbums, sortAlbumsOldestFirst } from "./artist";
 import { downloadState } from "./cancel";
-import { checkExisting, downloadTrack, getProgress } from "./download.native";
+import { checkExisting, downloadTrack, getProgress, restartApp } from "./download.native";
 import { settings } from "./Settings";
+
+/**
+ * Suelta los caches por-instancia de Luna (MediaItems/Albums con sus tags,
+ * brainz y contributors memoizados). Son SOLO cache — se recrean bajo demanda —
+ * pero en descargas largas acumulan cientos de MB que el GC no puede liberar
+ * mientras estén referenciados, hasta que el guard de Chromium recarga la
+ * página (y tumba a Luna). `_instances` es private de TypeScript pero accesible
+ * en runtime; si upstream lo renombra, esto queda como no-op inofensivo.
+ */
+const releaseLunaCaches = () => {
+	try {
+		const instances = (ContentBase as unknown as { _instances?: Record<string, Record<string, unknown>> })._instances;
+		if (instances === undefined) return;
+		if (instances.mediaItems) instances.mediaItems = {};
+		if (instances.albums) instances.albums = {};
+	} catch {
+		/* cache no disponible; seguir sin liberar */
+	}
+};
+
+/**
+ * Red de seguridad: reinicia TIDAL al terminar un bulk SOLO si el heap quedó
+ * alto (cerca del guard de Chromium que recargaría la página matando a Luna).
+ * El relaunch completo además recarga la inyección de Luna limpia.
+ */
+const maybeRestartAfterBulk = async (button: Button) => {
+	if (!settings.restartAfterBulk) return;
+	const usedMB = ((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1048576;
+	if (usedMB < 1100) return;
+	button.text = `Restarting TIDAL (${usedMB.toFixed(0)}MB heap)...`;
+	await sleep(4000);
+	if (downloadState.active) return; // arrancó otra descarga mientras tanto
+	await restartApp();
+};
 
 import styles from "file://downloadButton.css?minify";
 
@@ -275,6 +309,9 @@ const downloadAlbumList = async (albumIds: redux_ItemId[], folder: string, butto
 			if (downloadState.cancel) break;
 			if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
 		}
+		// Liberar los caches de Luna tras cada álbum: evita que la descarga larga
+		// acumule memoria hasta disparar el guard de Chromium (reload que mata Luna).
+		releaseLunaCaches();
 		if (!downloadState.cancel && settings.artistAlbumDelay > 0) await jitter(settings.artistAlbumDelay);
 	}
 	return { ok, failed };
@@ -362,6 +399,7 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 				const { ok, failed } = await downloadAlbumList(albumIds, folder, fullAlbumsButton);
 				const summary = `${ok} ok${failed ? `, ${failed} failed` : ""}`;
 				fullAlbumsButton.text = downloadState.cancel ? `Stopped (${summary})` : `Done — ${summary}`;
+				if (!downloadState.cancel) await maybeRestartAfterBulk(fullAlbumsButton);
 			} finally {
 				downloadState.active = false;
 				downloadState.cancel = false;
@@ -418,6 +456,7 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 			);
 			const summary = `${ok} ok${failed ? `, ${failed} failed` : ""}`;
 			artistButton.text = downloadState.cancel ? `Stopped (${summary})` : `Done — ${summary}`;
+			if (!downloadState.cancel) await maybeRestartAfterBulk(artistButton);
 		} finally {
 			downloadState.active = false;
 			downloadState.cancel = false;
