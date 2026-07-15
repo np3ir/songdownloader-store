@@ -190,6 +190,54 @@ const albumTMediaItems = async (albumId: redux_ItemId): Promise<redux.MediaItem[
 };
 
 /**
+ * Pre-chequeo RAW de existencia: construye el nombre de archivo SOLO con los
+ * datos crudos que ya vienen en la respuesta del álbum — sin construir el
+ * MediaItem (que dispara fetchBestQuality) ni pedir tags/contributors. En
+ * re-corridas de colecciones ya bajadas, hacer eso por cientos de tracks era
+ * la tormenta de memoria que recargaba/mataba el renderer.
+ *
+ * El nombre raw omite los featured extra de /contributors, así que si un track
+ * los tiene, el nombre difiere → el pre-chequeo falla → cae al flujo normal,
+ * que lo salta igual con el nombre exacto. Nunca produce nombres nuevos.
+ */
+const rawTrackExists = async (track: redux.Track, albumMeta: redux.Album | undefined, folder: string): Promise<boolean> => {
+	try {
+		const rawArtists = (track.artists ?? []).map((a) => ({ name: a.name, type: a.type }));
+		const ordered = orderArtists(rawArtists, []);
+		const title = cleanTitle(track.title, track.version ?? undefined, ordered.all);
+		const albumTitle = (albumMeta?.title ?? track.album?.title ?? "").replace(/\s*\(\s*(?:Explicit|E)\s*\)/gi, "").trim();
+		const date = albumMeta?.releaseDate ?? undefined;
+
+		const tags: Record<string, string | string[] | undefined> = {
+			title,
+			album: albumTitle || undefined,
+			trackNumber: String(track.trackNumber ?? ""),
+			discNumber: String(track.volumeNumber ?? 1),
+			date,
+			year: date && /^\d{4}/.test(date) ? date.slice(0, 4) : undefined,
+		};
+		if (ordered.all.length > 0) tags.artist = ordered.all;
+		const albumArtist = albumMeta?.artist?.name;
+		if (albumArtist) tags.albumArtist = [albumArtist];
+
+		const ext = settings.downloadQuality === "LOW" || settings.downloadQuality === "HIGH" ? "m4a" : "flac";
+		const name = buildFileName(settings.pathFormat, ext, tags, ordered.all, tags.albumArtist, {
+			separator: settings.artistSeparator,
+			useFullwidth: settings.useFullwidth,
+			maxArtistsInName: settings.maxArtistsInName,
+			trackNumberPadding: settings.trackNumberPadding,
+			discSubfolder: settings.discSubfolder,
+			numberOfVolumes: albumMeta?.numberOfVolumes ?? 1,
+			volumeNumber: track.volumeNumber ?? 1,
+			explicit: track.explicit ?? false,
+		});
+		return await checkExisting([folder, name]);
+	} catch {
+		return false; // ante cualquier duda, flujo normal (que decide con el nombre exacto)
+	}
+};
+
+/**
  * Descarga una lista de álbumes completos (por id) a `folder`, con contadores,
  * delays anti-bot y cancelación. Reusado por la descarga de artista completo y
  * por el botón "Download full albums" de playlists.
@@ -200,13 +248,27 @@ const downloadAlbumList = async (albumIds: redux_ItemId[], folder: string, butto
 	for (let i = 0; i < albumIds.length && !downloadState.cancel; i++) {
 		const tItems = await albumTMediaItems(albumIds[i]);
 		if (tItems.length === 0) continue; // álbum muerto en catálogo (404) o vacío
+		const albumMeta = await TidalApi.album(albumIds[i]).catch(() => undefined);
 
 		let j = 0;
-		for await (const mediaItem of MediaItem.fromTMediaItems(tItems)) {
+		for (const tItem of tItems) {
 			if (downloadState.cancel) break;
-			if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
+			if (tItem?.type !== "track") continue; // saltar videos (no soportados)
 			j++;
 			const prefix = `[${i + 1}/${albumIds.length} · ${j}] `;
+
+			// Capa 1: skip raw (0 fetches, 0 MediaItem) para archivos ya bajados
+			if (await rawTrackExists(tItem.item as redux.Track, albumMeta, folder)) {
+				button.text = `${prefix}Skipped (exists)`;
+				ok++;
+				continue;
+			}
+
+			const mediaItem = await MediaItem.fromId(tItem.item.id, tItem.type).catch(() => undefined);
+			if (mediaItem === undefined || mediaItem.contentType !== "track") {
+				failed++;
+				continue;
+			}
 			const success = await downloadMediaItem(mediaItem, folder, button, prefix);
 			if (success) ok++;
 			else failed++;
