@@ -39,10 +39,14 @@ const fetchAlbumsPage = (artistId: redux.ItemId, filter: string, offset: number)
 	);
 
 /** Trae TODOS los álbumes del artista (paginado). `includeSingles` añade una
- * segunda pasada con filter=EPSANDSINGLES. */
-export const getArtistAlbums = async (artistId: redux.ItemId, includeSingles: boolean): Promise<ApiAlbum[]> => {
+ * pasada con filter=EPSANDSINGLES; `includeCompilations` otra con
+ * filter=COMPILATIONS (recopilatorios Y algunos álbumes en vivo — TIDAL no
+ * tiene categoría LIVE propia: van en ALBUMS o en COMPILATIONS según el sello). */
+export const getArtistAlbums = async (artistId: redux.ItemId, includeSingles: boolean, includeCompilations = false): Promise<ApiAlbum[]> => {
 	const all: ApiAlbum[] = [];
-	const filters = includeSingles ? ["ALBUMS", "EPSANDSINGLES"] : ["ALBUMS"];
+	const filters = ["ALBUMS"];
+	if (includeSingles) filters.push("EPSANDSINGLES");
+	if (includeCompilations) filters.push("COMPILATIONS");
 	for (const filter of filters) {
 		let offset = 0;
 		while (true) {

@@ -440,7 +440,7 @@ ContextMenu.onOpen(unloads, async ({ event, contextMenu }) => {
 		artistButton.elem.classList.add("download-button");
 		try {
 			artistButton.text = `Fetching discography...`;
-			let albums = await getArtistAlbums(artistId, settings.artistIncludeSingles);
+			let albums = await getArtistAlbums(artistId, settings.artistIncludeSingles, settings.artistIncludeCompilations);
 			if (settings.artistDedup) albums = dedupAlbums(albums);
 			albums = sortAlbumsOldestFirst(albums);
 

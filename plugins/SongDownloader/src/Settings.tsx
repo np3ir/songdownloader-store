@@ -34,6 +34,7 @@ type Settings = {
 	discSubfolder: boolean;
 	// Descarga de artista completo
 	artistIncludeSingles: boolean;
+	artistIncludeCompilations: boolean;
 	artistDedup: boolean;
 	artistTrackDelay: number;
 	artistAlbumDelay: number;
@@ -54,6 +55,7 @@ export const settings = await ReactiveStore.getPluginStorage<Settings>("SongDown
 	trackNumberPadding: DEFAULT_TRACK_NUMBER_PADDING,
 	discSubfolder: true,
 	artistIncludeSingles: true,
+	artistIncludeCompilations: true,
 	artistDedup: true,
 	artistTrackDelay: 5, // = tiddl track_delay
 	artistAlbumDelay: 10, // = tiddl artist_delay
@@ -82,6 +84,7 @@ export const Settings = () => {
 	const [discSubfolder, setDiscSubfolder] = React.useState(settings.discSubfolder);
 	const [artistIncludeSingles, setArtistIncludeSingles] = React.useState(settings.artistIncludeSingles);
 	const [artistDedup, setArtistDedup] = React.useState(settings.artistDedup);
+	const [artistIncludeCompilations, setArtistIncludeCompilations] = React.useState(settings.artistIncludeCompilations);
 	const [restartAfterBulk, setRestartAfterBulk] = React.useState(settings.restartAfterBulk);
 	const [artistTrackDelay, setArtistTrackDelay] = React.useState(String(settings.artistTrackDelay));
 	const [artistAlbumDelay, setArtistAlbumDelay] = React.useState(String(settings.artistAlbumDelay));
@@ -235,6 +238,17 @@ export const Settings = () => {
 				desc={<>When downloading a whole artist (right-click an artist), also fetch their EPs and singles, not just albums.</>}
 				value={artistIncludeSingles}
 				onChange={(_, checked) => setArtistIncludeSingles((settings.artistIncludeSingles = checked))}
+			/>
+			<LunaSwitchSetting
+				title="Artist download · include compilations & live albums"
+				desc={
+					<>
+						Also fetch the artist's COMPILATIONS category (greatest-hits, label compilations — and the live albums some labels file
+						there instead of under albums).
+					</>
+				}
+				value={artistIncludeCompilations}
+				onChange={(_, checked) => setArtistIncludeCompilations((settings.artistIncludeCompilations = checked))}
 			/>
 			<LunaSwitchSetting
 				title="Artist download · deduplicate editions"
