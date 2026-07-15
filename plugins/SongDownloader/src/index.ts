@@ -162,8 +162,11 @@ const albumTMediaItems = async (albumId: redux_ItemId): Promise<redux.MediaItem[
 		const items = page?.items ?? [];
 		all.push(...items);
 		const total = page?.totalNumberOfItems ?? 0;
-		offset += page?.limit ?? 100;
-		if (items.length === 0 || offset >= total) break;
+		// Avanzar por lo RECIBIDO, nunca por el limit que el API dice aceptar:
+		// si el echo del limit difiere (o es 0), offset se quedaría fijo pidiendo
+		// la misma página (memoizada = instantánea) en un loop infinito -> OOM.
+		offset += items.length;
+		if (items.length === 0 || offset >= total || all.length >= total) break;
 	}
 	return all;
 };
