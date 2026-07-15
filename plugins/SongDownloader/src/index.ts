@@ -13,7 +13,7 @@ import { getFeaturedContributors } from "./contributors";
 import { cleanTitle, orderArtists } from "./tags";
 import { dedupAlbums, getArtistAlbums, sortAlbumsOldestFirst } from "./artist";
 import { downloadState } from "./cancel";
-import { downloadTrack, getProgress } from "./download.native";
+import { checkExisting, downloadTrack, getProgress } from "./download.native";
 import { settings } from "./Settings";
 
 import styles from "file://downloadButton.css?minify";
@@ -76,10 +76,15 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	const rawAlbumTitle = album?.tidalAlbum.title ?? mediaItem.tidalItem.album?.title;
 	if (rawAlbumTitle) tags.album = rawAlbumTitle.replace(/\s*\(\s*(?:Explicit|E)\s*\)/gi, "").trim();
 
-	// 4. Nombre de archivo (fullwidth + separador + cap + padding + multidisco)
-	setText(`Fetching filename...`);
-	const ext = await mediaItem.fileExtension(settings.downloadQuality);
-	const fileName = buildFileName(settings.pathFormat, ext, tags, ordered.all, tags.albumArtist, {
+	// 4a. FAST-SKIP: si el archivo ya existe, saltar ANTES del trabajo pesado
+	//     (fileExtension/playbackInfo/lyrics). En re-corridas de una colección ya
+	//     descargada, hacer todo eso por cientos de tracks a máxima velocidad
+	//     infla el renderer hasta matarlo. La extensión del pre-chequeo se deriva
+	//     de la calidad configurada (LOW/HIGH=AAC->m4a, lossless->flac); si el
+	//     archivo real tiene otra extensión (p.ej. fallback AAC), el pre-chequeo
+	//     falla y el flujo normal lo salta igual con el nombre exacto.
+	const precheckExt = settings.downloadQuality === "LOW" || settings.downloadQuality === "HIGH" ? "m4a" : "flac";
+	const buildOpts = {
 		separator: settings.artistSeparator,
 		useFullwidth: settings.useFullwidth,
 		maxArtistsInName: settings.maxArtistsInName,
@@ -88,7 +93,20 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 		numberOfVolumes: album?.tidalAlbum.numberOfVolumes ?? 1,
 		volumeNumber: mediaItem.tidalItem.volumeNumber ?? 1,
 		explicit: mediaItem.tidalItem.explicit ?? false,
-	});
+	};
+	if (downloadFolder !== undefined) {
+		const preName = buildFileName(settings.pathFormat, precheckExt, tags, ordered.all, tags.albumArtist, buildOpts);
+		if (await checkExisting([downloadFolder, preName])) {
+			setText(`Skipped (exists)`);
+			await sleep(200); // respiro: que la ráfaga de skips no ahogue al GC
+			return true;
+		}
+	}
+
+	// 4. Nombre de archivo (fullwidth + separador + cap + padding + multidisco)
+	setText(`Fetching filename...`);
+	const ext = await mediaItem.fileExtension(settings.downloadQuality);
+	const fileName = buildFileName(settings.pathFormat, ext, tags, ordered.all, tags.albumArtist, buildOpts);
 
 	// 5. Ruta destino
 	const path = downloadFolder !== undefined ? [downloadFolder, fileName] : await getDownloadPath(fileName);

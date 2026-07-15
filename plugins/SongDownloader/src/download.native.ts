@@ -63,6 +63,17 @@ const fileExists = async (path: string): Promise<boolean> => {
 	}
 };
 
+/**
+ * Pre-chequeo de existencia para el fast-skip del renderer: en re-corridas de
+ * colecciones ya descargadas evita hacer playbackInfo/lyrics por track solo
+ * para descubrir al final que el archivo ya estaba.
+ */
+export const checkExisting = async (path: string | string[]): Promise<boolean> => {
+	if (Array.isArray(path)) path = join(...path);
+	const parsed = parse(path);
+	return fileExists(join(parsed.dir, parsed.base));
+};
+
 export const downloadTrack = async (
 	trackId: string,
 	playbackInfo: PlaybackInfo,
