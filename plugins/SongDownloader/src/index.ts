@@ -90,7 +90,10 @@ const downloadMediaItem = async (mediaItem: MediaItem, downloadFolder: string | 
 	// 3. Override de tags según la convención propia del usuario.
 	//    El título se limpia pasándole la lista de artistas: así quita el sufijo
 	//    "(with X)"/"(feat. X)" solo si X ya está en {artist}, sin duplicarlo.
-	if (ordered.all.length > 0) tags.artist = ordered.all;
+	// Opcion A: el tag ARTIST como UN solo valor unido con el separador (VJ/RadioBoss
+	// no leen multivaluados; muestran solo el primero). El filename sigue usando
+	// ordered.all aparte, así que no se afecta.
+	if (ordered.all.length > 0) tags.artist = [ordered.all.join(settings.artistSeparator)];
 	tags.title = cleanTitle(mediaItem.tidalItem.title, mediaItem.tidalItem.version, ordered.all);
 
 	// 3b. Fecha del ÁLBUM para {year}/{date} (nunca por-track; evita fragmentar compilaciones).
@@ -250,7 +253,10 @@ const rawTrackExists = async (track: redux.Track, albumMeta: redux.Album | undef
 			date,
 			year: date && /^\d{4}/.test(date) ? date.slice(0, 4) : undefined,
 		};
-		if (ordered.all.length > 0) tags.artist = ordered.all;
+		// Opcion A: el tag ARTIST como UN solo valor unido con el separador (VJ/RadioBoss
+	// no leen multivaluados; muestran solo el primero). El filename sigue usando
+	// ordered.all aparte, así que no se afecta.
+	if (ordered.all.length > 0) tags.artist = [ordered.all.join(settings.artistSeparator)];
 		const albumArtist = albumMeta?.artist?.name;
 		if (albumArtist) tags.albumArtist = [albumArtist];
 
@@ -341,10 +347,16 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 		downloadState.cancel = false;
 		downloadButton.elem.classList.add("download-button");
 		try {
+			let processed = 0;
 			for await (const mediaItem of await mediaCollection.mediaItems()) {
 				if (downloadState.cancel) break;
 				if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
 				await downloadMediaItem(mediaItem, downloadFolder, downloadButton);
+				// Memoria: liberar los caches de Luna cada 25 tracks en listas grandes
+				// (playlists). Antes solo downloadAlbumList lo hacía (por álbum); este
+				// loop de colección no, así que en playlists grandes el heap crecía
+				// hasta disparar el reinicio de TIDAL. Igual patrón que downloadAlbumList.
+				if (++processed % 25 === 0) releaseLunaCaches();
 			}
 		} finally {
 			downloadState.active = false;
