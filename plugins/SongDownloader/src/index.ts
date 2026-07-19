@@ -28,11 +28,34 @@ const releaseLunaCaches = () => {
 	try {
 		const instances = (ContentBase as unknown as { _instances?: Record<string, Record<string, unknown>> })._instances;
 		if (instances === undefined) return;
-		if (instances.mediaItems) instances.mediaItems = {};
-		if (instances.albums) instances.albums = {};
+		// Vaciar TODOS los caches de instancias de Luna (mediaItems, albums,
+		// artists, playlists, ...), no solo mediaItems/albums — en listas MUY
+		// grandes los demás también pesan. Son caches lazy: se re-crean al vuelo.
+		for (const k of Object.keys(instances)) instances[k] = {};
 	} catch {
 		/* cache no disponible; seguir sin liberar */
 	}
+};
+
+const heapMB = () =>
+	((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1048576;
+
+/**
+ * Watchdog de memoria DURANTE la descarga: si el heap sube peligroso, libera
+ * caches; si aún sigue alto, hace un relaunch LIMPIO de Luna (que SÍ sobrevive)
+ * para adelantarse al guard de Chromium que recarga la página y MATA a Luna
+ * (+ corrompe el storage del plugin). Devuelve true si relanzó (parar el loop).
+ */
+const memoryWatchdog = async (button: Button): Promise<boolean> => {
+	if (!settings.restartAfterBulk) return false;
+	if (heapMB() < 700) return false;
+	releaseLunaCaches();
+	await sleep(100);
+	if (heapMB() < 700) return false;
+	button.text = `Restarting TIDAL (${heapMB().toFixed(0)}MB heap, preventing crash)...`;
+	await sleep(3000);
+	await restartApp();
+	return true;
 };
 
 /**
@@ -43,7 +66,7 @@ const releaseLunaCaches = () => {
 const maybeRestartAfterBulk = async (button: Button) => {
 	if (!settings.restartAfterBulk) return;
 	const usedMB = ((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1048576;
-	if (usedMB < 1100) return;
+	if (usedMB < 700) return;
 	button.text = `Restarting TIDAL (${usedMB.toFixed(0)}MB heap)...`;
 	await sleep(4000);
 	if (downloadState.active) return; // arrancó otra descarga mientras tanto
@@ -314,6 +337,8 @@ const downloadAlbumList = async (albumIds: redux_ItemId[], folder: string, butto
 			else failed++;
 			if (downloadState.cancel) break;
 			if (settings.artistTrackDelay > 0) await jitter(settings.artistTrackDelay);
+			if (j % 10 === 0) releaseLunaCaches();
+			if (await memoryWatchdog(button)) return { ok, failed };
 		}
 		// Liberar los caches de Luna tras cada álbum: evita que la descarga larga
 		// acumule memoria hasta disparar el guard de Chromium (reload que mata Luna).
@@ -352,11 +377,10 @@ ContextMenu.onMediaItem(unloads, async ({ mediaCollection, contextMenu }) => {
 				if (downloadState.cancel) break;
 				if (mediaItem.contentType !== "track") continue; // saltar videos (no soportados)
 				await downloadMediaItem(mediaItem, downloadFolder, downloadButton);
-				// Memoria: liberar los caches de Luna cada 25 tracks en listas grandes
-				// (playlists). Antes solo downloadAlbumList lo hacía (por álbum); este
-				// loop de colección no, así que en playlists grandes el heap crecía
-				// hasta disparar el reinicio de TIDAL. Igual patrón que downloadAlbumList.
-				if (++processed % 25 === 0) releaseLunaCaches();
+				// Memoria: liberar caches de Luna cada 10 tracks + watchdog de heap
+				// (relanza limpio antes de que el guard de Chromium recargue y mate a Luna).
+				if (++processed % 10 === 0) releaseLunaCaches();
+				if (await memoryWatchdog(downloadButton)) return;
 			}
 		} finally {
 			downloadState.active = false;

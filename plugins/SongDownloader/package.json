@@ -1,6 +1,6 @@
 {
 	"name": "SongDownloader ElVigilante",
-	"version": "1.7.0",
+	"version": "1.7.1",
 	"description": "Download Tidal songs as FLAC with a custom tagging convention: artist separator, featured from /contributors, .lrc sidecar, fullwidth sanitization, {artist_initials} folder and optional track-number padding. Fork of Inrixia/luna-plugins (SongDownloader).",
 	"homepage": "https://github.com/np3ir/songdownloader-store",
 	"author": {
